@@ -1,0 +1,68 @@
+{
+  "id": 7,
+  "createdAt": "2025-05-03T16:38:18.000Z",
+  "updatedAt": "2025-05-03T16:38:18.000Z",
+  "deletedAt": null,
+  "status": "published",
+  "rejectionReason": null,
+  "rejectedAt": null,
+  "title": "Test Product 2",
+  "subtitle": null,
+  "description": "Test Description",
+  "slug": "test-product-2",
+  "weight": 10,
+  "width": 10,
+  "height": 10,
+  "depth": 10,
+  "metadata": { "test": "test" },
+  "originCountry": null,
+  "variants": [
+    {
+      "id": 5,
+      "createdAt": "2025-05-03T16:38:18.000Z",
+      "updatedAt": "2025-05-03T16:38:18.000Z",
+      "deletedAt": null,
+      "productId": 7,
+      "title": "Test Variant",
+      "description": "Test Variant Description",
+      "sku": null,
+      "quantity": 0,
+      "manageStock": true,
+      "options": [
+        {
+          "id": 5,
+          "createdAt": "2025-05-03T16:38:18.000Z",
+          "updatedAt": "2025-05-03T16:38:18.000Z",
+          "deletedAt": null,
+          "productVariantId": 5,
+          "productOptionValueId": 11
+        }
+      ],
+      "prices": []
+    }
+  ],
+  "images": [
+    {
+      "id": 5,
+      "createdAt": "2025-05-03T16:38:18.000Z",
+      "updatedAt": "2025-05-03T16:38:18.000Z",
+      "deletedAt": null,
+      "productId": 7,
+      "imageUrl": "https://via.placeholder.com/150",
+      "rank": 0
+    }
+  ],
+  "tags": [],
+  "materials": [],
+  "options": [
+    {
+      "id": 6,
+      "createdAt": "2025-05-03T16:38:18.000Z",
+      "updatedAt": "2025-05-03T16:38:18.000Z",
+      "deletedAt": null,
+      "productId": 7,
+      "name": "Color"
+    }
+  ],
+  "categories": []
+}
