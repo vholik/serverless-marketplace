@@ -1,5 +1,10 @@
 import { relations, sql } from "drizzle-orm";
-import { index, primaryKey, sqliteTableCreator } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  primaryKey,
+  sqliteTableCreator,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import type { SQLiteColumnBuilders } from "drizzle-orm/sqlite-core/columns/all";
 import { type AdapterAccount } from "next-auth/adapters";
 
@@ -97,29 +102,36 @@ export const verificationTokensTable = createTable(
   }),
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
-
-export const productsTable = createTable("products", (d) => ({
-  id: d.integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
-  ...createTimestampsColumns(d),
-  status: d
-    .text()
-    .notNull()
-    .$type<"draft" | "published" | "rejected" | "proposed">()
-    .notNull()
-    .default("draft"),
-  rejectionReason: d.text(),
-  rejectedAt: d.integer({ mode: "timestamp" }),
-  title: d.text({ length: 256 }).notNull(),
-  subtitle: d.text({ length: 256 }),
-  description: d.text(),
-  slug: d.text({ length: 256 }).notNull(),
-  weight: d.integer({ mode: "number" }),
-  width: d.integer({ mode: "number" }),
-  height: d.integer({ mode: "number" }),
-  depth: d.integer({ mode: "number" }),
-  metadata: d.text({ mode: "json" }),
-  originCountry: d.text({ length: 256 }),
-}));
+export const productsTable = createTable(
+  "products",
+  (d) => ({
+    id: d.integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
+    ...createTimestampsColumns(d),
+    status: d
+      .text()
+      .notNull()
+      .$type<"draft" | "published" | "rejected" | "proposed">()
+      .notNull()
+      .default("draft"),
+    rejectionReason: d.text(),
+    rejectedAt: d.integer({ mode: "timestamp" }),
+    title: d.text({ length: 256 }).notNull(),
+    subtitle: d.text({ length: 256 }),
+    description: d.text(),
+    slug: d.text({ length: 256 }).notNull(),
+    weight: d.integer({ mode: "number" }),
+    width: d.integer({ mode: "number" }),
+    height: d.integer({ mode: "number" }),
+    depth: d.integer({ mode: "number" }),
+    metadata: d.text({ mode: "json" }),
+    originCountry: d.text({ length: 256 }),
+  }),
+  (t) => [
+    uniqueIndex("products_slug_unique_where_not_deleted")
+      .on(t.slug)
+      .where(sql`${t.deletedAt} is null`),
+  ],
+);
 
 export const productsRelations = relations(productsTable, ({ many }) => ({
   images: many(imagesTable),
