@@ -8,6 +8,13 @@
       "when": 1746288721141,
       "tag": "0000_fluffy_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1746290490540,
+      "tag": "0001_fat_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
-import { productRouter } from "./routers/product";
+import { productRouter } from "./routers/product/_router";
 
 export const appRouter = createTRPCRouter({
   product: productRouter,

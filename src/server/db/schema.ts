@@ -112,7 +112,7 @@ export const productsTable = createTable(
       .notNull()
       .$type<"draft" | "published" | "rejected" | "proposed">()
       .notNull()
-      .default("draft"),
+      .default("proposed"),
     rejectionReason: d.text(),
     rejectedAt: d.integer({ mode: "timestamp" }),
     title: d.text({ length: 256 }).notNull(),
@@ -140,7 +140,6 @@ export const productsRelations = relations(productsTable, ({ many }) => ({
   tags: many(productTagsMappingTable),
   materials: many(productMaterialsMappingTable),
   categories: many(productCategoriesMappingTable),
-  prices: many(priceTable),
 }));
 
 export const productOptionsTable = createTable("product_options", (d) => ({
@@ -337,15 +336,22 @@ export const productVariantOptionsRelations = relations(
     }),
   }),
 );
-
-export const categoriesTable = createTable("categories", (d) => ({
-  id: d.integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
-  ...createTimestampsColumns(d),
-  name: d.text({ length: 256 }).notNull(),
-  description: d.text(),
-  slug: d.text({ length: 256 }).notNull(),
-  parentId: d.integer({ mode: "number" }),
-}));
+export const categoriesTable = createTable(
+  "categories",
+  (d) => ({
+    id: d.integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
+    ...createTimestampsColumns(d),
+    name: d.text({ length: 256 }).notNull(),
+    description: d.text(),
+    slug: d.text({ length: 256 }).notNull(),
+    parentId: d.integer({ mode: "number" }),
+  }),
+  (t) => [
+    uniqueIndex("categories_slug_unique_where_not_deleted")
+      .on(t.slug)
+      .where(sql`${t.deletedAt} is null`),
+  ],
+);
 
 export const categoriesRelationsWithSelf = relations(
   categoriesTable,

@@ -1,4 +1,4 @@
-import { type IdDTO } from "../../types";
+import type { IdDTO } from "~/server/types";
 
 export type ProductStatus = "draft" | "published" | "rejected" | "proposed";
 
@@ -59,4 +59,25 @@ export type CreateProductShippingOptionPriceDTO = {
   rules: Record<string, string>;
 };
 
-export type UpdateProductVariantDTO = Partial<CreateProductVariantDTO>;
+export type CreateCategoryDTO = {
+  name: string;
+  description?: string | null;
+  slug?: string;
+  parentId?: number | null;
+};
+
+export type UpdateCategoryDTO = Partial<CreateCategoryDTO> & {
+  id: number;
+};
+
+export type CreateTagDTO = {
+  value: string;
+};
+
+export type CreateMaterialDTO = {
+  value: string;
+};
+
+export type UpdateProductDTO = Partial<CreateProductDTO> & {
+  id: number;
+};

@@ -1,7 +1,7 @@
 {
-  "id": 7,
-  "createdAt": "2025-05-03T16:38:18.000Z",
-  "updatedAt": "2025-05-03T16:38:18.000Z",
+  "id": 2,
+  "createdAt": "2025-05-03T19:08:00.000Z",
+  "updatedAt": "2025-05-03T19:08:00.000Z",
   "deletedAt": null,
   "status": "published",
   "rejectionReason": null,
@@ -18,11 +18,11 @@
   "originCountry": null,
   "variants": [
     {
-      "id": 5,
-      "createdAt": "2025-05-03T16:38:18.000Z",
-      "updatedAt": "2025-05-03T16:38:18.000Z",
+      "id": 2,
+      "createdAt": "2025-05-03T19:08:00.000Z",
+      "updatedAt": "2025-05-03T19:08:00.000Z",
       "deletedAt": null,
-      "productId": 7,
+      "productId": 2,
       "title": "Test Variant",
       "description": "Test Variant Description",
       "sku": null,
@@ -30,12 +30,13 @@
       "manageStock": true,
       "options": [
         {
-          "id": 5,
-          "createdAt": "2025-05-03T16:38:18.000Z",
-          "updatedAt": "2025-05-03T16:38:18.000Z",
+          "id": 2,
+          "createdAt": "2025-05-03T19:08:00.000Z",
+          "updatedAt": "2025-05-03T19:08:00.000Z",
           "deletedAt": null,
-          "productVariantId": 5,
-          "productOptionValueId": 11
+          "productVariantId": 2,
+          "productOptionValueId": 3,
+          "optionValue": { "id": 3, "productOptionId": 2, "value": "Red" }
         }
       ],
       "prices": []
@@ -43,11 +44,11 @@
   ],
   "images": [
     {
-      "id": 5,
-      "createdAt": "2025-05-03T16:38:18.000Z",
-      "updatedAt": "2025-05-03T16:38:18.000Z",
+      "id": 2,
+      "createdAt": "2025-05-03T19:08:00.000Z",
+      "updatedAt": "2025-05-03T19:08:00.000Z",
       "deletedAt": null,
-      "productId": 7,
+      "productId": 2,
       "imageUrl": "https://via.placeholder.com/150",
       "rank": 0
     }
@@ -56,12 +57,16 @@
   "materials": [],
   "options": [
     {
-      "id": 6,
-      "createdAt": "2025-05-03T16:38:18.000Z",
-      "updatedAt": "2025-05-03T16:38:18.000Z",
+      "id": 2,
+      "createdAt": "2025-05-03T19:08:00.000Z",
+      "updatedAt": "2025-05-03T19:08:00.000Z",
       "deletedAt": null,
-      "productId": 7,
-      "name": "Color"
+      "productId": 2,
+      "name": "Color",
+      "values": [
+        { "id": 3, "productOptionId": 2, "value": "Red" },
+        { "id": 4, "productOptionId": 2, "value": "Blue" }
+      ]
     }
   ],
   "categories": []

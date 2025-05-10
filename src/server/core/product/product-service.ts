@@ -1,4 +1,3 @@
-import type { CreateProductDTO } from "./types";
 import {
   productsTable,
   productTagsMappingTable,
@@ -8,12 +7,21 @@ import {
   productOptionsTable,
   productOptionValuesTable,
   productVariantOptionsMappingTable,
+  productTagsTable,
+  productMaterialsTable,
+  productCategoriesMappingTable,
 } from "~/server/db/schema";
 import { promiseAll } from "~/server/utils/promise-all";
 import { isValidSlug, slugify } from "~/server/utils/slug";
 import { createTransaction, useTransaction } from "~/server/db/transaction";
-import { eq, isNull, and } from "drizzle-orm";
+import { eq, isNull, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { type ProductTypes } from "./types";
+import type { IdDTO } from "~/server/types";
+
+export * from "./product-category-service";
+export * from "./product-tag-service";
+export * from "./product-material-service";
 
 export const list = async () => {
   return await useTransaction(async (tx) => {
@@ -22,14 +30,16 @@ export const list = async () => {
       with: {
         variants: {
           with: {
-            options: true,
+            options: {
+              with: { optionValue: true },
+            },
             prices: true,
           },
         },
         images: true,
         tags: true,
         materials: true,
-        options: true,
+        options: { with: { values: true } },
         categories: true,
       },
     });
@@ -63,7 +73,7 @@ export const fromID = async (id: number) => {
   });
 };
 
-export const create = async (input: CreateProductDTO) => {
+export const create = async (input: ProductTypes.CreateProductDTO) => {
   const {
     options,
     images,
@@ -79,7 +89,7 @@ export const create = async (input: CreateProductDTO) => {
   _validateProduct(input);
 
   return await createTransaction(async (tx) => {
-    const [product] = await tx
+    const [product_] = await tx
       .insert(productsTable)
       .values({
         ...rest,
@@ -88,137 +98,38 @@ export const create = async (input: CreateProductDTO) => {
       })
       .returning({ id: productsTable.id });
 
-    if (!product) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Product creation failed",
-      });
-    }
+    const product = product_!;
 
     const promises: Promise<unknown>[] = [];
 
     const optionsMap = new Map<string, { id: number; value: string }[]>();
 
     if (options?.length) {
-      await promiseAll(
-        options.map(async (option) => {
-          const [createdOption] = await tx
-            .insert(productOptionsTable)
-            .values({
-              name: option.name,
-              productId: product.id,
-            })
-            .returning({ id: productOptionsTable.id });
+      await _upsertOptions(product.id, options, optionsMap);
+    }
 
-          const createdOptionValues = await tx
-            .insert(productOptionValuesTable)
-            .values(
-              option.values.map((value) => ({
-                value,
-                productOptionId: createdOption!.id,
-              })),
-            )
-            .returning({
-              id: productOptionValuesTable.id,
-              value: productOptionValuesTable.value,
-            });
-
-          createdOptionValues.forEach((optionValue) => {
-            const existingOptionValues = optionsMap.get(option.name);
-
-            optionsMap.set(option.name, [
-              ...(existingOptionValues ?? []),
-              { id: optionValue.id, value: optionValue.value },
-            ]);
-          });
-        }),
-      );
+    if (categories?.length) {
+      promises.push(_upsertCategories(product.id, categories));
     }
 
     if (variants?.length) {
-      promises.push(
-        ...variants.map(async (variant) => {
-          const { options, prices, ...rest } = variant;
-
-          const [createdVariant] = await tx
-            .insert(productVariantsTable)
-            .values({
-              ...rest,
-              productId: product.id,
-            })
-            .returning({ id: productVariantsTable.id });
-
-          await tx.insert(productVariantOptionsMappingTable).values(
-            Object.entries(options).map(([key, value]) => {
-              const option = optionsMap.get(key);
-
-              if (!option) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: `Option ${key} not found`,
-                });
-              }
-
-              const optionValue = option.find(
-                (option) => option.value === value,
-              );
-
-              if (!optionValue) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: `Option value ${value} not found`,
-                });
-              }
-
-              return {
-                productVariantId: createdVariant!.id,
-                productOptionValueId: optionValue.id,
-              };
-            }),
-          );
-
-          // todo: handle pricing using pricing module
-        }),
-      );
+      promises.push(_upsertVariants(product.id, variants, optionsMap));
     }
 
     if (tags?.length) {
-      promises.push(
-        ...tags.map((tag) =>
-          tx.insert(productTagsMappingTable).values({
-            tagId: tag.id,
-            productId: product.id,
-          }),
-        ),
-      );
+      promises.push(_upsertTags(product.id, tags));
     }
 
     if (images?.length) {
-      promises.push(
-        ...images.map((url, rank) =>
-          tx.insert(imagesTable).values({
-            rank,
-            imageUrl: url,
-            productId: product.id,
-          }),
-        ),
-      );
+      promises.push(_upsertImages(product.id, images));
     }
 
     if (materials?.length) {
-      promises.push(
-        ...materials.map((material) =>
-          tx.insert(productMaterialsMappingTable).values({
-            materialId: material.id,
-            productId: product.id,
-          }),
-        ),
-      );
+      promises.push(_upsertMaterials(product.id, materials));
     }
 
     await promiseAll(promises);
 
-    // todo: handle categories
     // todo: handle shipping options using fulfillment module
     // todo: emit event
 
@@ -226,7 +137,262 @@ export const create = async (input: CreateProductDTO) => {
   });
 };
 
-const _validateProduct = (input: CreateProductDTO) => {
+export const update = async (input: ProductTypes.UpdateProductDTO) => {
+  const {
+    id,
+    categories,
+    tags,
+    materials,
+    variants,
+    shippingOptions,
+    options,
+    images,
+    ...rest
+  } = input;
+
+  return await createTransaction(async (tx) => {
+    await tx.update(productsTable).set(rest).where(eq(productsTable.id, id));
+
+    const promises: Promise<unknown>[] = [];
+
+    const optionsMap = new Map<string, { id: number; value: string }[]>();
+
+    if (options?.length) {
+      await _upsertOptions(id, options, optionsMap);
+    }
+
+    if (categories?.length) {
+      promises.push(_upsertCategories(id, categories));
+    }
+
+    if (tags?.length) {
+      promises.push(_upsertTags(id, tags));
+    }
+
+    if (materials?.length) {
+      promises.push(_upsertMaterials(id, materials));
+    }
+
+    if (variants?.length) {
+      promises.push(_upsertVariants(id, variants, optionsMap));
+    }
+
+    if (images?.length) {
+      promises.push(_upsertImages(id, images));
+    }
+
+    await promiseAll(promises);
+  });
+};
+
+const _upsertCategories = async (productId: number, categories: IdDTO[]) => {
+  return await createTransaction(async (tx) => {
+    const existingCategories = await tx
+      .select({ categoryId: productCategoriesMappingTable.categoryId })
+      .from(productCategoriesMappingTable)
+      .where(
+        inArray(
+          productCategoriesMappingTable.categoryId,
+          categories.map((category) => category.id),
+        ),
+      );
+
+    const existingCategoriesSet = new Set(
+      existingCategories.map((category) => category.categoryId),
+    );
+
+    await promiseAll(
+      categories.map((category) => {
+        if (!existingCategoriesSet.has(category.id)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Category with ID ${category.id} not found`,
+          });
+        }
+
+        return tx.insert(productCategoriesMappingTable).values({
+          productId,
+          categoryId: category.id,
+        });
+      }),
+    );
+  });
+};
+
+const _upsertMaterials = async (productId: number, materials: IdDTO[]) => {
+  return await createTransaction(async (tx) => {
+    const existingMaterials = await tx
+      .select({ id: productMaterialsTable.id })
+      .from(productMaterialsTable)
+      .where(
+        inArray(
+          productMaterialsTable.id,
+          materials.map((material) => material.id),
+        ),
+      );
+
+    const existingMaterialsSet = new Set(
+      existingMaterials.map((material) => material.id),
+    );
+
+    await promiseAll(
+      materials.map((material) => {
+        if (!existingMaterialsSet.has(material.id)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Material with ID ${material.id} not found`,
+          });
+        }
+
+        return tx.insert(productMaterialsMappingTable).values({
+          materialId: material.id,
+          productId: productId,
+        });
+      }),
+    );
+  });
+};
+
+const _upsertTags = async (productId: number, tags: IdDTO[]) => {
+  return await createTransaction(async (tx) => {
+    const existingTags = await tx
+      .select({ id: productTagsTable.id })
+      .from(productTagsTable)
+      .where(
+        inArray(
+          productTagsTable.id,
+          tags.map((tag) => tag.id),
+        ),
+      );
+
+    const existingTagsSet = new Set(existingTags.map((tag) => tag.id));
+
+    await promiseAll(
+      tags.map((tag) => {
+        if (!existingTagsSet.has(tag.id)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Tag with ID ${tag.id} not found`,
+          });
+        }
+
+        return tx.insert(productTagsMappingTable).values({
+          tagId: tag.id,
+          productId,
+        });
+      }),
+    );
+  });
+};
+
+const _upsertOptions = async (
+  productId: number,
+  options: ProductTypes.CreateProductOptionDTO[],
+  optionsMap: Map<string, { id: number; value: string }[]>,
+) => {
+  return await createTransaction(async (tx) => {
+    await promiseAll(
+      options.map(async (option) => {
+        const [createdOption] = await tx
+          .insert(productOptionsTable)
+          .values({
+            name: option.name,
+            productId,
+          })
+          .returning({ id: productOptionsTable.id });
+
+        const createdOptionValues = await tx
+          .insert(productOptionValuesTable)
+          .values(
+            option.values.map((value) => ({
+              value,
+              productOptionId: createdOption!.id,
+            })),
+          )
+          .returning({
+            id: productOptionValuesTable.id,
+            value: productOptionValuesTable.value,
+          });
+
+        createdOptionValues.forEach((optionValue) => {
+          const existingOptionValues = optionsMap.get(option.name);
+
+          optionsMap.set(option.name, [
+            ...(existingOptionValues ?? []),
+            { id: optionValue.id, value: optionValue.value },
+          ]);
+        });
+      }),
+    );
+  });
+};
+
+const _upsertVariants = async (
+  productId: number,
+  variants: ProductTypes.CreateProductVariantDTO[],
+  optionsMap: Map<string, { id: number; value: string }[]>,
+) => {
+  return await createTransaction(async (tx) => {
+    await promiseAll(
+      variants.map(async (variant) => {
+        const { options, prices, ...rest } = variant;
+
+        const [createdVariant] = await tx
+          .insert(productVariantsTable)
+          .values({
+            ...rest,
+            productId,
+          })
+          .returning({ id: productVariantsTable.id });
+
+        await tx.insert(productVariantOptionsMappingTable).values(
+          Object.entries(options).map(([key, value]) => {
+            const option = optionsMap.get(key);
+
+            if (!option) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `Option ${key} not found`,
+              });
+            }
+
+            const optionValue = option.find((option) => option.value === value);
+
+            if (!optionValue) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `Option value ${value} not found`,
+              });
+            }
+
+            return {
+              productVariantId: createdVariant!.id,
+              productOptionValueId: optionValue.id,
+            };
+          }),
+        );
+
+        // todo: handle pricing using pricing module
+      }),
+    );
+  });
+};
+
+const _upsertImages = async (productId: number, images: string[]) => {
+  return await createTransaction(async (tx) => {
+    await promiseAll(
+      images.map((url, rank) =>
+        tx.insert(imagesTable).values({
+          rank,
+          imageUrl: url,
+          productId,
+        }),
+      ),
+    );
+  });
+};
+
+const _validateProduct = (input: ProductTypes.CreateProductDTO) => {
   const { slug, variants, options } = input;
 
   if (slug && !isValidSlug(slug)) {
