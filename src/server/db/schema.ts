@@ -102,6 +102,7 @@ export const verificationTokensTable = createTable(
   }),
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
+
 export const productsTable = createTable(
   "products",
   (d) => ({
@@ -123,7 +124,7 @@ export const productsTable = createTable(
     width: d.integer({ mode: "number" }),
     height: d.integer({ mode: "number" }),
     depth: d.integer({ mode: "number" }),
-    metadata: d.text({ mode: "json" }),
+    attributes: d.text({ mode: "json" }),
     originCountry: d.text({ length: 256 }),
   }),
   (t) => [
@@ -288,6 +289,7 @@ export const productVariantsTable = createTable("product_variants", (d) => ({
     .integer({ mode: "number" })
     .references(() => productsTable.id)
     .notNull(),
+  attributes: d.text({ mode: "json" }),
   title: d.text({ length: 256 }).notNull(),
   description: d.text(),
   sku: d.text({ length: 256 }),
@@ -443,7 +445,7 @@ export const shippingOptionPricesTable = createTable(
       .notNull(),
     amount: d.integer({ mode: "number" }).notNull(),
     currencyCode: d.text({ length: 256 }).notNull(),
-    rules: d.text(), // {countryCode: 'pl'}
+    rules: d.text({ mode: "json" }),
   }),
 );
 
@@ -456,3 +458,29 @@ export const shippingOptionPricesRelations = relations(
     }),
   }),
 );
+
+export const storesTable = createTable(
+  "stores",
+  (d) => ({
+    id: d.integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
+    ...createTimestampsColumns(d),
+    name: d.text({ length: 256 }).notNull(),
+    slug: d.text({ length: 256 }).notNull(),
+    description: d.text(),
+    logo: d.text({ length: 256 }),
+    currencyCode: d.text({ length: 256 }).notNull(),
+  }),
+  (t) => [
+    uniqueIndex("stores_slug_unique_where_not_deleted")
+      .on(t.slug)
+      .where(sql`${t.deletedAt} is null`),
+  ],
+);
+
+// todo
+// - add cart
+// - add order
+// - add payment
+// - add shipping
+// - add customer
+// - add address

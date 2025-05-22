@@ -51,14 +51,14 @@ export const productRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const result = await Product.create(input);
 
-      const product = await Product.fromID(result.id);
+      const product = await Product.retrieve(result.id);
 
       return product;
     }),
   fromID: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      const product = await Product.fromID(input.id);
+      const product = await Product.retrieve(input.id);
       return product;
     }),
   remove: publicProcedure
