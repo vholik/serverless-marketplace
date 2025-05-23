@@ -1,3 +1,5 @@
+think of creatinh hooks using node_hooks like injection those hooks inside class
+
 # Create T3 App
 
 This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.

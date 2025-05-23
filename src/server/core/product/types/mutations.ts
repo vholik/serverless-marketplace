@@ -22,7 +22,7 @@ export type CreateProductDTO = {
   materials?: IdDTO[];
   variants?: CreateProductVariantDTO[];
   categories?: IdDTO[];
-  shippingOptions?: CreateProductShippingOptionDTO[];
+  shippingOptions?: IdDTO[];
 };
 
 export type CreateProductOptionDTO = {
@@ -45,18 +45,6 @@ export type CreateProductVariantPriceDTO = {
   currencyCode: string;
   rules: Record<string, string>;
   type: PriceType;
-};
-
-export type CreateProductShippingOptionDTO = {
-  name: string;
-  postalCode?: string;
-  countryCode?: string;
-};
-
-export type CreateProductShippingOptionPriceDTO = {
-  amount: number;
-  currencyCode: string;
-  rules: Record<string, string>;
 };
 
 export type CreateCategoryDTO = {

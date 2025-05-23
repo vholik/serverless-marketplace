@@ -4,66 +4,70 @@ import { and } from "drizzle-orm";
 import { categoriesTable } from "~/server/db/schema";
 
 import { createTransaction, useTransaction } from "~/server/db/transaction";
-import type { ProductTypes } from "./types";
 import { slugify } from "~/server/utils/slug";
+import type { CreateCategoryDTO, UpdateCategoryDTO } from "./types";
 
-export const getCategoryFromID = async (id: number) => {
-  return await useTransaction(async (tx) => {
-    const category = await tx.query.categoriesTable.findFirst({
-      where: and(eq(categoriesTable.id, id), isNull(categoriesTable.deletedAt)),
-    });
-
-    if (!category) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: `Category with ID ${id} not found`,
+export class ProductCategory {
+  async retrieve(id: number) {
+    return await useTransaction(async (tx) => {
+      const category = await tx.query.categoriesTable.findFirst({
+        where: and(
+          eq(categoriesTable.id, id),
+          isNull(categoriesTable.deletedAt),
+        ),
       });
-    }
 
-    return category;
-  });
-};
+      if (!category) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Category with ID ${id} not found`,
+        });
+      }
 
-export const createCategory = async (input: ProductTypes.CreateCategoryDTO) => {
-  return await createTransaction(async (tx) => {
-    const [createdCategory] = await tx
-      .insert(categoriesTable)
-      .values({
-        ...input,
-        slug: input.slug ?? slugify(input.name),
-      })
-
-      .returning({ id: categoriesTable.id });
-
-    return createdCategory!;
-  });
-};
-
-export const updateCategory = async (input: ProductTypes.UpdateCategoryDTO) => {
-  const { id, ...rest } = input;
-  return await createTransaction(async (tx) => {
-    await tx
-      .update(categoriesTable)
-      .set(rest)
-      .where(eq(categoriesTable.id, id));
-  });
-};
-
-export const removeCategory = async (id: number) => {
-  return await createTransaction(async (tx) => {
-    await tx
-      .update(categoriesTable)
-      .set({
-        deletedAt: new Date(),
-      })
-      .where(eq(categoriesTable.id, id));
-  });
-};
-
-export const listCategories = async () => {
-  return await useTransaction(async (tx) => {
-    return await tx.query.categoriesTable.findMany({
-      where: isNull(categoriesTable.deletedAt),
+      return category;
     });
-  });
-};
+  }
+
+  async create(input: CreateCategoryDTO) {
+    return await createTransaction(async (tx) => {
+      const [createdCategory] = await tx
+        .insert(categoriesTable)
+        .values({
+          ...input,
+          slug: input.slug ?? slugify(input.name),
+        })
+        .returning({ id: categoriesTable.id });
+
+      return createdCategory!;
+    });
+  }
+
+  async update(input: UpdateCategoryDTO) {
+    const { id, ...rest } = input;
+    return await createTransaction(async (tx) => {
+      await tx
+        .update(categoriesTable)
+        .set(rest)
+        .where(eq(categoriesTable.id, id));
+    });
+  }
+
+  async delete(id: number) {
+    return await createTransaction(async (tx) => {
+      await tx
+        .update(categoriesTable)
+        .set({
+          deletedAt: new Date(),
+        })
+        .where(eq(categoriesTable.id, id));
+    });
+  }
+
+  async list() {
+    return await useTransaction(async (tx) => {
+      return await tx.query.categoriesTable.findMany({
+        where: isNull(categoriesTable.deletedAt),
+      });
+    });
+  }
+}

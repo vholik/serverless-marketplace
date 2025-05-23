@@ -1,1 +1,1 @@
-export type * as ProductTypes from "./mutations";
+export * from "./mutations";

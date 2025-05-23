@@ -124,7 +124,7 @@ export const productsTable = createTable(
     width: d.integer({ mode: "number" }),
     height: d.integer({ mode: "number" }),
     depth: d.integer({ mode: "number" }),
-    attributes: d.text({ mode: "json" }),
+    attributes: d.text({ mode: "json" }).default("{}"),
     originCountry: d.text({ length: 256 }),
   }),
   (t) => [
@@ -141,6 +141,7 @@ export const productsRelations = relations(productsTable, ({ many }) => ({
   tags: many(productTagsMappingTable),
   materials: many(productMaterialsMappingTable),
   categories: many(productCategoriesMappingTable),
+  shippingOptions: many(productShippingOptionsMappingTable),
 }));
 
 export const productOptionsTable = createTable("product_options", (d) => ({
@@ -289,7 +290,7 @@ export const productVariantsTable = createTable("product_variants", (d) => ({
     .integer({ mode: "number" })
     .references(() => productsTable.id)
     .notNull(),
-  attributes: d.text({ mode: "json" }),
+  attributes: d.text({ mode: "json" }).default("{}"),
   title: d.text({ length: 256 }).notNull(),
   description: d.text(),
   sku: d.text({ length: 256 }),
@@ -314,6 +315,10 @@ export const productVariantOptionsMappingTable = createTable(
   (d) => ({
     id: d.integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
     ...createTimestampsColumns(d),
+    productId: d
+      .integer({ mode: "number" })
+      .references(() => productsTable.id)
+      .notNull(),
     productVariantId: d
       .integer({ mode: "number" })
       .references(() => productVariantsTable.id)
@@ -338,6 +343,7 @@ export const productVariantOptionsRelations = relations(
     }),
   }),
 );
+
 export const categoriesTable = createTable(
   "categories",
   (d) => ({
@@ -398,6 +404,35 @@ export const productCategoriesRelations = relations(
   }),
 );
 
+export const productShippingOptionsMappingTable = createTable(
+  "product_shipping_options",
+  (d) => ({
+    productId: d
+      .integer({ mode: "number" })
+      .references(() => productsTable.id)
+      .notNull(),
+    shippingOptionId: d
+      .integer({ mode: "number" })
+      .references(() => shippingOptionsTable.id)
+      .notNull(),
+  }),
+  (t) => [primaryKey({ columns: [t.productId, t.shippingOptionId] })],
+);
+
+export const productShippingOptionsMappingRelations = relations(
+  productShippingOptionsMappingTable,
+  ({ one }) => ({
+    product: one(productsTable, {
+      fields: [productShippingOptionsMappingTable.productId],
+      references: [productsTable.id],
+    }),
+    shippingOption: one(shippingOptionsTable, {
+      fields: [productShippingOptionsMappingTable.shippingOptionId],
+      references: [shippingOptionsTable.id],
+    }),
+  }),
+);
+
 export const priceTable = createTable("prices", (d) => ({
   id: d.integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
   ...createTimestampsColumns(d),
@@ -406,8 +441,8 @@ export const priceTable = createTable("prices", (d) => ({
     .references(() => productVariantsTable.id)
     .notNull(),
   amount: d.integer({ mode: "number" }).notNull(),
-  currencyCode: d.text({ length: 256 }).notNull(),
-  rules: d.text({ mode: "json" }),
+  currency: d.text({ length: 256 }).notNull(),
+  rules: d.text({ mode: "json" }).default("{}"),
   type: d.text().$type<"default" | "sale">().notNull(),
 }));
 
@@ -431,6 +466,7 @@ export const shippingOptionsRelations = relations(
   shippingOptionsTable,
   ({ many }) => ({
     prices: many(shippingOptionPricesTable),
+    products: many(productShippingOptionsMappingTable),
   }),
 );
 
@@ -444,8 +480,8 @@ export const shippingOptionPricesTable = createTable(
       .references(() => shippingOptionsTable.id)
       .notNull(),
     amount: d.integer({ mode: "number" }).notNull(),
-    currencyCode: d.text({ length: 256 }).notNull(),
-    rules: d.text({ mode: "json" }),
+    currency: d.text({ length: 256 }).notNull(),
+    rules: d.text({ mode: "json" }).default("{}"),
   }),
 );
 
@@ -468,7 +504,7 @@ export const storesTable = createTable(
     slug: d.text({ length: 256 }).notNull(),
     description: d.text(),
     logo: d.text({ length: 256 }),
-    currencyCode: d.text({ length: 256 }).notNull(),
+    currency: d.text({ length: 256 }).notNull(),
   }),
   (t) => [
     uniqueIndex("stores_slug_unique_where_not_deleted")
@@ -476,11 +512,3 @@ export const storesTable = createTable(
       .where(sql`${t.deletedAt} is null`),
   ],
 );
-
-// todo
-// - add cart
-// - add order
-// - add payment
-// - add shipping
-// - add customer
-// - add address

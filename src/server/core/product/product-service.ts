@@ -10,17 +10,23 @@ import {
   productTagsTable,
   productMaterialsTable,
   productCategoriesMappingTable,
+  productShippingOptionsMappingTable,
 } from "~/server/db/schema";
 import { promiseAll } from "~/server/utils/promise-all";
 import { isValidSlug, slugify } from "~/server/utils/slug";
 import { createTransaction, useTransaction } from "~/server/db/transaction";
 import { eq, isNull, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { type ProductTypes } from "./types";
 import type { IdDTO } from "~/server/types";
+import type {
+  CreateProductDTO,
+  CreateProductOptionDTO,
+  CreateProductVariantDTO,
+  UpdateProductDTO,
+} from "./types";
 
 export class Product {
-  private validateProduct_(input: ProductTypes.CreateProductDTO) {
+  private validateProduct_(input: CreateProductDTO) {
     const { slug, variants, options } = input;
 
     if (slug && !isValidSlug(slug)) {
@@ -140,7 +146,7 @@ export class Product {
 
   private async upsertOptions_(
     productId: number,
-    options: ProductTypes.CreateProductOptionDTO[],
+    options: CreateProductOptionDTO[],
     optionsMap: Map<string, { id: number; value: string }[]>,
   ) {
     return await createTransaction(async (tx) => {
@@ -182,10 +188,18 @@ export class Product {
 
   private async upsertVariants_(
     productId: number,
-    variants: ProductTypes.CreateProductVariantDTO[],
+    variants: CreateProductVariantDTO[],
     optionsMap: Map<string, { id: number; value: string }[]>,
   ) {
     return await createTransaction(async (tx) => {
+      await tx
+        .delete(productVariantsTable)
+        .where(eq(productVariantsTable.productId, productId));
+
+      await tx
+        .delete(productVariantOptionsMappingTable)
+        .where(eq(productVariantOptionsMappingTable.productId, productId));
+
       await promiseAll(
         variants.map(async (variant) => {
           const { options, prices, ...rest } = variant;
@@ -223,6 +237,7 @@ export class Product {
               return {
                 productVariantId: createdVariant!.id,
                 productOptionValueId: optionValue.id,
+                productId,
               };
             }),
           );
@@ -235,14 +250,32 @@ export class Product {
 
   private async upsertImages_(productId: number, images: string[]) {
     return await createTransaction(async (tx) => {
-      await promiseAll(
-        images.map((url, rank) =>
-          tx.insert(imagesTable).values({
-            rank,
-            imageUrl: url,
-            productId,
-          }),
-        ),
+      await tx.delete(imagesTable).where(eq(imagesTable.productId, productId));
+
+      await tx.insert(imagesTable).values(
+        images.map((url, rank) => ({
+          rank,
+          imageUrl: url,
+          productId,
+        })),
+      );
+    });
+  }
+
+  private async upsertShippingOptions_(
+    productId: number,
+    shippingOptionsIds: IdDTO[],
+  ) {
+    return await createTransaction(async (tx) => {
+      await tx
+        .delete(productShippingOptionsMappingTable)
+        .where(eq(productShippingOptionsMappingTable.productId, productId));
+
+      await tx.insert(productShippingOptionsMappingTable).values(
+        shippingOptionsIds.map((id) => ({
+          productId,
+          shippingOptionId: id.id,
+        })),
       );
     });
   }
@@ -267,7 +300,7 @@ export class Product {
     });
   }
 
-  async create(input: ProductTypes.CreateProductDTO) {
+  async create(input: CreateProductDTO) {
     const {
       options,
       images,
@@ -324,14 +357,17 @@ export class Product {
 
       await promiseAll(promises);
 
-      // todo: handle shipping options using fulfillment module
+      if (shippingOptions?.length) {
+        promises.push(this.upsertShippingOptions_(product.id, shippingOptions));
+      }
+
       // todo: emit event
 
       return product;
     });
   }
 
-  async update(input: ProductTypes.UpdateProductDTO) {
+  async update(input: UpdateProductDTO) {
     const {
       id,
       categories,
@@ -373,6 +409,10 @@ export class Product {
 
       if (images?.length) {
         promises.push(this.upsertImages_(id, images));
+      }
+
+      if (shippingOptions?.length) {
+        promises.push(this.upsertShippingOptions_(id, shippingOptions));
       }
 
       await promiseAll(promises);

@@ -1,8 +1,8 @@
 import { eq, isNull } from "drizzle-orm";
 import { productTagsTable } from "~/server/db/schema";
 import { createTransaction, useTransaction } from "~/server/db/transaction";
-import type { ProductTypes } from "./types";
 import { TRPCError } from "@trpc/server";
+import type { CreateTagDTO } from "./types";
 
 export class ProductTag {
   async list() {
@@ -15,7 +15,7 @@ export class ProductTag {
     });
   }
 
-  async create(input: ProductTypes.CreateTagDTO) {
+  async create(input: CreateTagDTO) {
     return await createTransaction(async (tx) => {
       const [createdTag] = await tx
         .insert(productTagsTable)

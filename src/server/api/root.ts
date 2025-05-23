@@ -1,8 +1,14 @@
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
-import { productRouter } from "./routers/product/_router";
+import { productRouter } from "./routers/product";
+import { productCategoryRouter } from "./routers/product-category";
+import { productMaterialRouter } from "./routers/product-material";
+import { productTagRouter } from "./routers/product-tag";
 
 export const appRouter = createTRPCRouter({
   product: productRouter,
+  productCategory: productCategoryRouter,
+  productMaterial: productMaterialRouter,
+  productTag: productTagRouter,
 });
 
 /**

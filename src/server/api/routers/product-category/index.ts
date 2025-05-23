@@ -1,22 +1,23 @@
 import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { Product } from "~/server/core/product";
+import { CreateCategorySchema } from "./validators";
+import { sdk } from "~/server/core";
 
 export const productCategoryRouter = createTRPCRouter({
   create: publicProcedure
-    .input(z.object({ name: z.string() }))
+    .input(CreateCategorySchema)
     .mutation(async ({ input }) => {
-      const result = await Product.createCategory({ name: input.name });
+      const result = await sdk.category.create({ name: input.name });
 
-      return await Product.getCategoryFromID(result.id);
+      return await sdk.category.retrieve(result.id);
     }),
   remove: publicProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
-      await Product.removeCategory(input.id);
+      await sdk.category.delete(input.id);
     }),
   list: publicProcedure.query(async () => {
-    return await Product.listCategories();
+    return await sdk.category.list();
   }),
 });

@@ -1,1 +1,1 @@
-export * as Fulfillment from "./fulfillment-service";
+export * from "./shipping-option";
