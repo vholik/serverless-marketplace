@@ -1,4 +1,5 @@
 import type { IdDTO } from "~/server/types";
+import type { CreatePriceDTO } from "../../pricing/types";
 
 export type ProductStatus = "draft" | "published" | "rejected" | "proposed";
 
@@ -37,7 +38,7 @@ export type CreateProductVariantDTO = {
   quantity?: number;
   manageStock?: boolean;
   options: Record<string, string>;
-  prices?: CreateProductVariantPriceDTO[];
+  prices?: CreatePriceDTO[];
 };
 
 export type CreateProductVariantPriceDTO = {

@@ -1,1 +1,1 @@
-export * from "./shipping-option";
+export * from "./shipping-option-service";

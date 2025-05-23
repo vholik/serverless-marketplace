@@ -24,8 +24,11 @@ import type {
   CreateProductVariantDTO,
   UpdateProductDTO,
 } from "./types";
+import type { Pricing } from "../pricing";
 
 export class Product {
+  constructor(private readonly pricing: Pricing) {}
+
   private validateProduct_(input: CreateProductDTO) {
     const { slug, variants, options } = input;
 
@@ -196,10 +199,6 @@ export class Product {
         .delete(productVariantsTable)
         .where(eq(productVariantsTable.productId, productId));
 
-      await tx
-        .delete(productVariantOptionsMappingTable)
-        .where(eq(productVariantOptionsMappingTable.productId, productId));
-
       await promiseAll(
         variants.map(async (variant) => {
           const { options, prices, ...rest } = variant;
@@ -242,7 +241,14 @@ export class Product {
             }),
           );
 
-          // todo: handle pricing using pricing module
+          if (prices?.length) {
+            await this.pricing.create(
+              prices.map((price) => ({
+                ...price,
+                variantId: createdVariant!.id,
+              })),
+            );
+          }
         }),
       );
     });
