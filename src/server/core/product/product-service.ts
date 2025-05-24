@@ -1,17 +1,3 @@
-import {
-  productsTable,
-  productTagsMappingTable,
-  productVariantsTable,
-  imagesTable,
-  productMaterialsMappingTable,
-  productOptionsTable,
-  productOptionValuesTable,
-  productVariantOptionsMappingTable,
-  productTagsTable,
-  productMaterialsTable,
-  productCategoriesMappingTable,
-  productShippingOptionsMappingTable,
-} from "~/server/db/schema";
 import { promiseAll } from "~/server/utils/promise-all";
 import { isValidSlug, slugify } from "~/server/utils/slug";
 import { createTransaction, useTransaction } from "~/server/db/transaction";
@@ -25,9 +11,313 @@ import type {
   UpdateProductDTO,
 } from "./types";
 import type { Pricing } from "../pricing";
+import {
+  categoriesTable,
+  imagesTable,
+  productCategoriesMappingTable,
+  productMaterialsMappingTable,
+  productMaterialsTable,
+  productOptionsTable,
+  productOptionValuesTable,
+  productShippingOptionsMappingTable,
+  productsTable,
+  productTagsMappingTable,
+  productTagsTable,
+  productVariantOptionsMappingTable,
+  productVariantsTable,
+} from "./product.sql";
+import {
+  shippingOptionPricesTable,
+  shippingOptionsTable,
+} from "../fulfillment";
 
 export class Product {
   constructor(private readonly pricing: Pricing) {}
+
+  async list() {
+    return await useTransaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(productsTable)
+        .where(isNull(productsTable.deletedAt))
+        .leftJoin(imagesTable, eq(productsTable.id, imagesTable.productId))
+        .leftJoin(
+          productTagsMappingTable,
+          eq(productsTable.id, productTagsMappingTable.productId),
+        )
+        .leftJoin(
+          productTagsTable,
+          eq(productTagsMappingTable.tagId, productTagsTable.id),
+        )
+        .leftJoin(
+          productMaterialsMappingTable,
+          eq(productsTable.id, productMaterialsMappingTable.productId),
+        )
+        .leftJoin(
+          productMaterialsTable,
+          eq(productMaterialsMappingTable.materialId, productMaterialsTable.id),
+        )
+        .leftJoin(
+          productVariantsTable,
+          eq(productsTable.id, productVariantsTable.productId),
+        )
+        .leftJoin(
+          productVariantOptionsMappingTable,
+          eq(
+            productVariantsTable.id,
+            productVariantOptionsMappingTable.productVariantId,
+          ),
+        )
+        .leftJoin(
+          productOptionValuesTable,
+          eq(
+            productVariantOptionsMappingTable.productOptionValueId,
+            productOptionValuesTable.id,
+          ),
+        )
+        .leftJoin(
+          productCategoriesMappingTable,
+          eq(productsTable.id, productCategoriesMappingTable.productId),
+        )
+        .leftJoin(
+          categoriesTable,
+          eq(productCategoriesMappingTable.categoryId, categoriesTable.id),
+        )
+        .leftJoin(
+          productShippingOptionsMappingTable,
+          eq(productsTable.id, productShippingOptionsMappingTable.productId),
+        )
+        .leftJoin(
+          shippingOptionsTable,
+          eq(
+            productShippingOptionsMappingTable.shippingOptionId,
+            shippingOptionsTable.id,
+          ),
+        )
+        .leftJoin(
+          shippingOptionPricesTable,
+          eq(
+            shippingOptionsTable.id,
+            shippingOptionPricesTable.shippingOptionId,
+          ),
+        );
+
+      // todo: add serialize
+
+      return rows;
+    });
+  }
+
+  async retrieve(id: number) {
+    return await useTransaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(productsTable)
+        .where(and(isNull(productsTable.deletedAt), eq(productsTable.id, id)))
+        .leftJoin(imagesTable, eq(productsTable.id, imagesTable.productId))
+        .leftJoin(
+          productTagsMappingTable,
+          eq(productsTable.id, productTagsMappingTable.productId),
+        )
+        .leftJoin(
+          productTagsTable,
+          eq(productTagsMappingTable.tagId, productTagsTable.id),
+        )
+        .leftJoin(
+          productMaterialsMappingTable,
+          eq(productsTable.id, productMaterialsMappingTable.productId),
+        )
+        .leftJoin(
+          productMaterialsTable,
+          eq(productMaterialsMappingTable.materialId, productMaterialsTable.id),
+        )
+        .leftJoin(
+          productVariantsTable,
+          eq(productsTable.id, productVariantsTable.productId),
+        )
+        .leftJoin(
+          productVariantOptionsMappingTable,
+          eq(
+            productVariantsTable.id,
+            productVariantOptionsMappingTable.productVariantId,
+          ),
+        )
+        .leftJoin(
+          productOptionValuesTable,
+          eq(
+            productVariantOptionsMappingTable.productOptionValueId,
+            productOptionValuesTable.id,
+          ),
+        )
+        .leftJoin(
+          productCategoriesMappingTable,
+          eq(productsTable.id, productCategoriesMappingTable.productId),
+        )
+        .leftJoin(
+          categoriesTable,
+          eq(productCategoriesMappingTable.categoryId, categoriesTable.id),
+        )
+        .leftJoin(
+          productShippingOptionsMappingTable,
+          eq(productsTable.id, productShippingOptionsMappingTable.productId),
+        )
+        .leftJoin(
+          shippingOptionsTable,
+          eq(
+            productShippingOptionsMappingTable.shippingOptionId,
+            shippingOptionsTable.id,
+          ),
+        )
+        .leftJoin(
+          shippingOptionPricesTable,
+          eq(
+            shippingOptionsTable.id,
+            shippingOptionPricesTable.shippingOptionId,
+          ),
+        );
+
+      // todo: add serialize
+
+      if (!row) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Product not found",
+        });
+      }
+
+      return row;
+    });
+  }
+
+  async create(input: CreateProductDTO) {
+    const {
+      options,
+      images,
+      tags,
+      materials,
+      variants,
+      categories,
+      shippingOptions,
+      slug,
+      ...rest
+    } = input;
+
+    this.validateProduct_(input);
+
+    return await createTransaction(async (tx) => {
+      const [product_] = await tx
+        .insert(productsTable)
+        .values({
+          ...rest,
+          status: rest.status ?? "draft",
+          slug: slug ?? slugify(rest.title),
+        })
+        .returning({ id: productsTable.id });
+
+      const product = product_!;
+
+      const promises: Promise<unknown>[] = [];
+
+      const optionsMap = new Map<string, { id: number; value: string }[]>();
+
+      if (options?.length) {
+        await this.upsertOptions_(product.id, options, optionsMap);
+      }
+
+      if (categories?.length) {
+        promises.push(this.upsertCategories_(product.id, categories));
+      }
+
+      if (variants?.length) {
+        promises.push(this.upsertVariants_(product.id, variants, optionsMap));
+      }
+
+      if (tags?.length) {
+        promises.push(this.upsertTags_(product.id, tags));
+      }
+
+      if (images?.length) {
+        promises.push(this.upsertImages_(product.id, images));
+      }
+
+      if (materials?.length) {
+        promises.push(this.upsertMaterials_(product.id, materials));
+      }
+
+      await promiseAll(promises);
+
+      if (shippingOptions?.length) {
+        promises.push(this.upsertShippingOptions_(product.id, shippingOptions));
+      }
+
+      // todo: emit event
+
+      return product;
+    });
+  }
+
+  async update(input: UpdateProductDTO) {
+    const {
+      id,
+      categories,
+      tags,
+      materials,
+      variants,
+      shippingOptions,
+      options,
+      images,
+      ...rest
+    } = input;
+
+    return await createTransaction(async (tx) => {
+      await tx.update(productsTable).set(rest).where(eq(productsTable.id, id));
+
+      const promises: Promise<unknown>[] = [];
+
+      const optionsMap = new Map<string, { id: number; value: string }[]>();
+
+      if (options?.length) {
+        await this.upsertOptions_(id, options, optionsMap);
+      }
+
+      if (categories?.length) {
+        promises.push(this.upsertCategories_(id, categories));
+      }
+
+      if (tags?.length) {
+        promises.push(this.upsertTags_(id, tags));
+      }
+
+      if (materials?.length) {
+        promises.push(this.upsertMaterials_(id, materials));
+      }
+
+      if (variants?.length) {
+        promises.push(this.upsertVariants_(id, variants, optionsMap));
+      }
+
+      if (images?.length) {
+        promises.push(this.upsertImages_(id, images));
+      }
+
+      if (shippingOptions?.length) {
+        promises.push(this.upsertShippingOptions_(id, shippingOptions));
+      }
+
+      await promiseAll(promises);
+    });
+  }
+
+  async delete(id: number) {
+    return await createTransaction(async (tx) => {
+      await tx
+        .update(productsTable)
+        .set({
+          deletedAt: new Date(),
+        })
+        .where(eq(productsTable.id, id));
+    });
+  }
 
   private validateProduct_(input: CreateProductDTO) {
     const { slug, variants, options } = input;
@@ -283,156 +573,6 @@ export class Product {
           shippingOptionId: id.id,
         })),
       );
-    });
-  }
-
-  async list() {
-    return await useTransaction(async (tx) => {
-      const products = await tx.query.productsTable.findMany({
-        where: isNull(productsTable.deletedAt),
-      });
-
-      return products;
-    });
-  }
-
-  async retrieve(id: number) {
-    return await useTransaction(async (tx) => {
-      const product = await tx.query.productsTable.findFirst({
-        where: and(eq(productsTable.id, id), isNull(productsTable.deletedAt)),
-      });
-
-      return product;
-    });
-  }
-
-  async create(input: CreateProductDTO) {
-    const {
-      options,
-      images,
-      tags,
-      materials,
-      variants,
-      categories,
-      shippingOptions,
-      slug,
-      ...rest
-    } = input;
-
-    this.validateProduct_(input);
-
-    return await createTransaction(async (tx) => {
-      const [product_] = await tx
-        .insert(productsTable)
-        .values({
-          ...rest,
-          status: rest.status ?? "draft",
-          slug: slug ?? slugify(rest.title),
-        })
-        .returning({ id: productsTable.id });
-
-      const product = product_!;
-
-      const promises: Promise<unknown>[] = [];
-
-      const optionsMap = new Map<string, { id: number; value: string }[]>();
-
-      if (options?.length) {
-        await this.upsertOptions_(product.id, options, optionsMap);
-      }
-
-      if (categories?.length) {
-        promises.push(this.upsertCategories_(product.id, categories));
-      }
-
-      if (variants?.length) {
-        promises.push(this.upsertVariants_(product.id, variants, optionsMap));
-      }
-
-      if (tags?.length) {
-        promises.push(this.upsertTags_(product.id, tags));
-      }
-
-      if (images?.length) {
-        promises.push(this.upsertImages_(product.id, images));
-      }
-
-      if (materials?.length) {
-        promises.push(this.upsertMaterials_(product.id, materials));
-      }
-
-      await promiseAll(promises);
-
-      if (shippingOptions?.length) {
-        promises.push(this.upsertShippingOptions_(product.id, shippingOptions));
-      }
-
-      // todo: emit event
-
-      return product;
-    });
-  }
-
-  async update(input: UpdateProductDTO) {
-    const {
-      id,
-      categories,
-      tags,
-      materials,
-      variants,
-      shippingOptions,
-      options,
-      images,
-      ...rest
-    } = input;
-
-    return await createTransaction(async (tx) => {
-      await tx.update(productsTable).set(rest).where(eq(productsTable.id, id));
-
-      const promises: Promise<unknown>[] = [];
-
-      const optionsMap = new Map<string, { id: number; value: string }[]>();
-
-      if (options?.length) {
-        await this.upsertOptions_(id, options, optionsMap);
-      }
-
-      if (categories?.length) {
-        promises.push(this.upsertCategories_(id, categories));
-      }
-
-      if (tags?.length) {
-        promises.push(this.upsertTags_(id, tags));
-      }
-
-      if (materials?.length) {
-        promises.push(this.upsertMaterials_(id, materials));
-      }
-
-      if (variants?.length) {
-        promises.push(this.upsertVariants_(id, variants, optionsMap));
-      }
-
-      if (images?.length) {
-        promises.push(this.upsertImages_(id, images));
-      }
-
-      if (shippingOptions?.length) {
-        promises.push(this.upsertShippingOptions_(id, shippingOptions));
-      }
-
-      await promiseAll(promises);
-    });
-  }
-
-  async delete(id: number) {
-    return await createTransaction(async (tx) => {
-      await tx
-        .update(productsTable)
-        .set({
-          deletedAt: new Date(),
-        })
-        .where(eq(productsTable.id, id));
     });
   }
 }

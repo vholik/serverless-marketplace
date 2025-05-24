@@ -1,3 +1,4 @@
+import { Pricing } from "./pricing";
 import {
   Product,
   ProductCategory,
@@ -10,9 +11,11 @@ export class StackOS {
   public category: ProductCategory;
   public material: ProductMaterial;
   public tag: ProductTag;
+  public pricing: Pricing;
 
   constructor() {
-    this.product = new Product();
+    this.pricing = new Pricing();
+    this.product = new Product(this.pricing);
     this.category = new ProductCategory();
     this.material = new ProductMaterial();
     this.tag = new ProductTag();

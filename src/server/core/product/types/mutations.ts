@@ -3,8 +3,6 @@ import type { CreatePriceDTO } from "../../pricing/types";
 
 export type ProductStatus = "draft" | "published" | "rejected" | "proposed";
 
-export type PriceType = "default" | "sale";
-
 export type CreateProductDTO = {
   title: string;
   subtitle?: string | null;
@@ -39,13 +37,6 @@ export type CreateProductVariantDTO = {
   manageStock?: boolean;
   options: Record<string, string>;
   prices?: CreatePriceDTO[];
-};
-
-export type CreateProductVariantPriceDTO = {
-  amount: number;
-  currencyCode: string;
-  rules: Record<string, string>;
-  type: PriceType;
 };
 
 export type CreateCategoryDTO = {
